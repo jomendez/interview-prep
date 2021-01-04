@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react'
+import React, { useRef, useState, useEffect } from 'react'
 import './Video.scss'
 
 function genId() {
@@ -14,6 +14,9 @@ export default function Video() {
 
     const [isRecording, setIsRecording] = useState(false)
     const [tracks, setTracks] = useState([])
+    const [playingMode, setPlayingMode] = useState(false)
+    const [track, setTrack] = useState(null)
+    const [previewToggle, setPreviewToggle] = useState(false)
 
     let recordingTimeMS = 5000;
 
@@ -26,6 +29,8 @@ export default function Video() {
     }
 
     function startRecording(stream, lengthInMS) {
+        setPlayingMode(false)
+        setTrack(null)
         let recorder = new MediaRecorder(stream);
         let data = [];
 
@@ -51,13 +56,30 @@ export default function Video() {
     }
 
     function previewHandle() {
+        setTrack(null)
+        setPlayingMode(false)
+        setPreviewToggle((prev) => {
+            if (prev) {
+                stopHandler()
+                return false
+            } else {
+                doPreview()
+                return true
+            }
+        })
+
+    }
+
+    function doPreview() {
         navigator.mediaDevices.getUserMedia({
             video: true,
             audio: true
         })
             .then(stream => {
                 preview.current.srcObject = stream;
-                downloadButton.current.href = stream;
+                if (downloadButton.current) {
+                    downloadButton.current.href = stream;
+                }
                 preview.current.captureStream = preview.current.captureStream || preview.current.mozCaptureStream;
                 return new Promise(resolve => {
                     return preview.current.onplaying = resolve
@@ -66,18 +88,23 @@ export default function Video() {
     }
 
     function startStopButton() {
-        if (isRecording) {
+        setPlayingMode(false)
+        if (isRecording) {//When stop
             stopHandler()
             setIsRecording(false)
             return
         }
+
+        //when start
         navigator.mediaDevices.getUserMedia({
             video: true,
             audio: true
         })
             .then(stream => {
                 preview.current.srcObject = stream;
-                downloadButton.current.href = stream;
+                if (downloadButton.current) {
+                    downloadButton.current.href = stream;
+                }
                 preview.current.captureStream = preview.current.captureStream || preview.current.mozCaptureStream;
                 return new Promise(resolve => {
                     return preview.current.onplaying = resolve
@@ -97,8 +124,6 @@ export default function Video() {
                 })
                 setTracks(newObj)
 
-                //@@@
-
                 setIsRecording(false)
 
                 log("Successfully recorded " + (recordedBlob.size / 1024).toFixed(2) + " KB of " +
@@ -110,10 +135,18 @@ export default function Video() {
             });
     }
 
+    useEffect(() => {// triggered when we are going to play a recorded track
+        if (track && playingMode && downloadButton.current) {
+            recording.current.src = URL.createObjectURL(track.track);
+            downloadButton.current.href = recording.current.src;
+            downloadButton.current.download = "RecordedVideo.webm";
+        }
+    }, [track, playingMode])
+
     function playTrack(track) {
-        recording.current.src = URL.createObjectURL(track);
-        downloadButton.current.href = recording.current.src;
-        downloadButton.current.download = "RecordedVideo.webm";
+        setPreviewToggle(false)
+        setPlayingMode(true)
+        setTrack(track)
     }
 
     function stop(stream) {
@@ -121,7 +154,12 @@ export default function Video() {
     }
 
     function stopHandler() {
-        stop(preview.current.srcObject);
+        setTrack(null)
+        if (preview.current) {
+            setPreviewToggle(false)
+            setPlayingMode(false)
+            stop(preview.current.srcObject);
+        }
     }
 
     return (
@@ -138,41 +176,30 @@ export default function Video() {
                     <div className="video-container">
                         <div className="video-control">
                             <h2>Preview</h2>
-                            <video ref={preview} id="preview" width="160" height="120" autoPlay muted></video>
+                            {!playingMode && <video ref={preview} id="preview" width="160" height="120" autoPlay muted></video>}
+                            {playingMode && <video ref={recording} id="recording" width="160" height="120" controls></video>}
                         </div>
                         <div className="video-buttons">
-                            <button className="button" onClick={previewHandle}>Preview</button>
-                            <button className="button" onClick={startStopButton}>{isRecording ? 'Stop' : 'Start Record'}</button>
+                            <button className="button" onClick={previewHandle}>{previewToggle ? 'Stop preview' : 'Preview'}</button>
+                            <div className="record-download-btn">
+                                <button className="button" onClick={startStopButton}>{isRecording ? 'Stop' : 'Start Record'}</button>
+                                {playingMode && (<a ref={downloadButton} id="downloadButton" className="button">
+                                    Download
+                                </a>)}
+                            </div>
                         </div>
                     </div>
                     <nav>
                         <h2>Preview</h2>
                         <ul>
-                            {tracks.map((item)=> (<li key={item.id} onClick={()=>{ playTrack(item.track)}}>Play Track - {item.id}</li>))}
-                           
+                            {tracks.map((item) => (<li className={track && track.id === item.id? 'active-item' : ''} 
+                            key={item.id} onClick={() => { playTrack(item) }}>Play Track - {item.id}</li>))}
+
                         </ul>
                     </nav>
                 </div>
             </section>
 
-            <div className="left">
-                {/* <button id="startButton" className="button" onClick={startButton}>
-                    Start
-            </button> */}
-                {/* <h2>Preview</h2>
-                <video ref={preview} id="preview" width="160" height="120" autoPlay muted></video> */}
-            </div>
-
-            <div className="right">
-                {/* <button id="stopButton" className="button" onClick={stopButton}>
-                    Stop
-                </button> */}
-                <h2>Recording</h2>
-                <video ref={recording} id="recording" width="160" height="120" controls></video>
-                <a ref={downloadButton} id="downloadButton" className="button">
-                    Download
-                </a>
-            </div>
 
             <div className="bottom">
                 <pre ref={logElement} id="log"></pre>

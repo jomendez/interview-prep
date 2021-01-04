@@ -53,18 +53,32 @@
                 flex-direction: column;
                 .video-control {
                     padding: 16px;
+                    #recording {}
                 }
                 .video-buttons {
                     display: flex;
                     align-items: center;
                     justify-content: space-between;
-                    button {}
+                    .record-download-btn {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        a {
+                            margin-left: 16px;
+                        }
+                    }
                 }
             }
             nav {
                 flex-basis: 20%;
                 ul {
-                    li {}
+                    li {
+                        margin-bottom: 8px;
+                        cursor: pointer;
+                        &.active-item {
+                            color: red
+                        }
+                    }
                 }
             }
         }
